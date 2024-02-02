@@ -1,0 +1,5 @@
+.env
+node_modules
+trash
+data/claim-history.json
+data/liquidator-history.json
