@@ -17,8 +17,10 @@ const CONFIG = {
 
   // Claimer Configuration
   USEAPI: true, // Use the prize API for winner calculations
-  TIERSTOCLAIM: [0, 1, 2, 3, 4,  5, 6], // Prize tiers to claim
-  TXDELAY: 10000, // Delay between transactions in milliseconds
+//  TIERSTOCLAIM: [0, 1, 2, 3, 4,  5, 6], // Prize tiers to claim
+  
+TIERSTOCLAIM: [0, 1, 2],
+TXDELAY: 10000, // Delay between transactions in milliseconds
   MINPROFIT: 0.03, // Minimum acceptable profit in $ for a claim transaction
   MINPROFITPERCENTAGE: 1.001, // Minimum profit percentage for acceptance, 1.01 = 101%
   MAXWINNERS: 10, // Maximum number of winners to claim per transaction

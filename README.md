@@ -8,17 +8,6 @@ Theres some other mess laying around too!
 
 warning: These bots execute financial transactions and can result in a loss. Use at your own risk. To minimize risk you can keep a lower amount of funds on the wallet being used to send transactions. 
 
-## this is an evolving set of scripts. some improvements to make...
-
-- More pricing and swap
-- Decimal parsing
-- Better play by play
-- Liquidator logging bug
-- Relay should check that the recent relay actually worked
-- General cleanup
-- Organize prize DB
-- Docs
-
 # Getting started
 
 You will need
@@ -74,3 +63,14 @@ new prize network deployments/chains can be added in constants/address.js
 
 ## winBooster
 - the win booster contract is gated to the service provider, to use this you will need to deploy your own booster contract and app
+
+## this is an evolving set of scripts. some improvements to make...
+
+- More pricing and swap
+- Decimal parsing
+- Better play by play
+- Liquidator logging bug
+- Relay should check that the recent relay actually worked
+- General cleanup
+- Organize prize DB
+- Docs
