@@ -94,7 +94,7 @@ CONFIG.WALLET, awardsBalance
 
     
 if(web3TotalGasCostUSD > (parseInt(awardsBalance)/1e18*prizeTokenPrice*CLAIM_COST_AS_PERCENTAGE/100)){
-console.log("gas cost exceeds claim cost as a percentage")}else{
+console.log("gas cost to claim rewards is too high")}else{
 //console.log("ready to claim but returning for testing");return
     // Sign and send the transaction
     const submittedTx = await PRIZEPOOL_CONTRACT.withdrawRewards(CONFIG.WALLET, awardsBalance);

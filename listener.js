@@ -51,7 +51,7 @@ async function listen() {
           // console.log("prize claimed event ", claimEvent)
           const decodedLog =
         CONTRACTS.PRIZEPOOL[chain].interface.parseLog(claimEvent);
-console.log("claim event",decodedLog)        
+//console.log("claim event",decodedLog)        
 const args = decodedLog.args
         const claim = {
           network: chainId,

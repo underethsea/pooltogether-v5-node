@@ -17,10 +17,8 @@ const CONFIG = {
 
   // Claimer Configuration
   USEAPI: true, // Use the prize API for winner calculations
-//  TIERSTOCLAIM: [0, 1, 2, 3, 4,  5, 6], // Prize tiers to claim
-  
-TIERSTOCLAIM: [0, 1, 2],
-TXDELAY: 10000, // Delay between transactions in milliseconds
+  TIERSTOCLAIM: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  TXDELAY: 10000, // Delay between transactions in milliseconds
   MINPROFIT: 0.03, // Minimum acceptable profit in $ for a claim transaction
   MINPROFITPERCENTAGE: 1.001, // Minimum profit percentage for acceptance, 1.01 = 101%
   MAXWINNERS: 10, // Maximum number of winners to claim per transaction
@@ -40,7 +38,7 @@ TXDELAY: 10000, // Delay between transactions in milliseconds
   // Liquidator Configuration
   slippage: 5, // Slippage tolerance for transactions (basis points)
   maxGas: 600000, // Estimated gas amount per transaction
-  profitThreshold: 0.001, // Profit threshold in $ for considering a transaction
+  profitThreshold: 0.02, // Profit threshold in $ for considering a transaction
   profitPercentage: 1.001, // Required profit percentage over cost
 
   // WinBooster Configuration
@@ -56,7 +54,7 @@ TXDELAY: 10000, // Delay between transactions in milliseconds
   CLAIM_WINDOW_CLOSED: 24, // 14 is 2pm
   SECOND_CLAIM_WINDOW_OPEN: 22,
   SECOND_CLAIM_WINDOW_CLOSED: 24,
-  BLACKLIST: ['0xa5c3a513645a9a00cb561fed40438e9dfe0d6a69','0x7aa51a31334576ac29e1d0f35fc5b08232b214af','0x77935f2c72b5eb814753a05921ae495aa283906b','0x33b81b6130e0684c140a110d921fa307b48991d6'],
+  BLACKLIST: [],
 };
 
 module.exports = { CONFIG };

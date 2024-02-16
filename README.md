@@ -69,7 +69,6 @@ new prize network deployments/chains can be added in constants/address.js
 - More pricing and swap
 - Decimal parsing
 - Better play by play
-- Liquidator logging bug
 - Relay should check that the recent relay actually worked
 - General cleanup
 - Organize prize DB
