@@ -10,7 +10,8 @@ const opEndpoint =  "https://opt-mainnet.g.alchemy.com/v2/" + process.env.ALCHEM
 // Create a new Web3 instance with a provider URL
 const web3 = new Web3(opEndpoint);
 
-web3.registerPlugin(new OptimismPlugin());
+const provider = new ethers.providers.JsonRpcProvider(opEndpoint);
+const web3 = new Web3(provider);
 
 async function web3GasEstimate(data, chain, from, to) { 
   try {
