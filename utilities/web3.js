@@ -2,14 +2,15 @@ require('../env-setup');
 const  {Web3}  = require('web3');
 const { OptimismPlugin } = require('@eth-optimism/web3.js-plugin');
 const ethers = require('ethers');
+const { PROVIDERS } = require('../constants/providers')
+const { CONFIG } = require('../constants/config')
 //require('dotenv').config(); // Adjust the path as needed
 
 
 const opEndpoint =  "https://opt-mainnet.g.alchemy.com/v2/" + process.env.ALCHEMY_KEY
 
 // Create a new Web3 instance with a provider URL
-const provider = new ethers.providers.JsonRpcProvider(opEndpoint);
-const web3 = new Web3(provider);
+const web3 = new Web3(opEndpoint);
 
 web3.registerPlugin(new OptimismPlugin());
 

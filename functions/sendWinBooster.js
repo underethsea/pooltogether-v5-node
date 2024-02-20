@@ -163,20 +163,27 @@ console.log("cost per prize in pool",costPerPrizeInPool.toString()," 0- >",(cost
 for (let j = 0; j < winners.length; j++) {
     let winner = winners[j];
     let numberOfPrizes = indices[j].length;
+if (addressBalances[winner]) {
+    console.log(`Winner ${winner} with maxClaimCost of ${(addressBalances[winner].maxClaimCost / 1e18).toFixed(5)} and balance ${(addressBalances[winner].ethBalance / 1e18).toFixed(5)} check`);
+    console.log("cost per prize to claim", (costPerPrizeInPool / 1e18).toFixed(5), " POOL");
 
-     console.log(`Winner ${winner} with maxClaimCost of ${(addressBalances[winner].maxClaimCost/1e18).toFixed(5)} and balance ${(addressBalances[winner].ethBalance/1e18).toFixed(5)} checking.`);
-console.log("cost per prize to claim",(costPerPrizeInPool/1e18).toFixed(5)," POOL")
-
- // Check if the cost per prize exceeds the winner's max claim fee
+    // Check if the cost per prize exceeds the winner's max claim fee
     if (addressBalances[winner].maxClaimCost.lt(costPerPrizeInPool)) {
-        console.log(`Winner ${winner} with maxClaimCost of ${(addressBalances[winner].maxClaimCost/1e18).toFixed(5)} can't claim because the cost per prize exceeds their max claim fee.`);
+        console.log(`Winner ${winner} with maxClaimCost of ${(addressBalances[winner].maxClaimCost / 1e18).toFixed(5)} can't claim because the cost per prize exceeds their max claim fee.`);
         winners.splice(j, 1);
         indices.splice(j, 1);
         j--; // Adjust index due to splice
         isModified = true;
-        continue; // Proceed to the next winner
+        continue;
     }
-
+} else {
+    console.log(`Winner ${winner} does not have a balance record and cannot claim.`);
+    winners.splice(j, 1);
+    indices.splice(j, 1);
+    j--; // Adjust index due to splice
+    isModified = true;
+    continue;
+}
     // Calculate the maximum number of prizes this winner can afford
     let maxAffordablePrizes = addressBalances[winner].ethBalance.div(costPerPrizeInPool);
 
@@ -264,6 +271,21 @@ let txStatic = await grouperContract.callStatic.claim(
 } catch(e){console.log("error callstatic claim",e)}
 */  
     // return here to not send
+
+// hard check on claim fee being less than prize
+// Recalculate the total prize value
+const numberOfPrizesBeingClaimed = indices.flat(Infinity).length;
+const totalPrizeValueInPoolUnits = tierValue.mul(numberOfPrizesBeingClaimed);
+
+// Convert txCostWithFeeInPool back to a comparable unit if needed
+// Assuming txCostWithFeeInPool is in the same unit as tierValue for direct comparison
+
+// Check if the transaction cost exceeds the total prize value
+if (txCostWithFeeInPool.gt(totalPrizeValueInPoolUnits)) {
+    console.log("Aborting: Transaction cost exceeds the total value of the prizes being claimed.");
+    return false; // Abort the sending process
+}
+
 try{
           let tx = await grouperContract.claim(
             vault,
@@ -321,13 +343,14 @@ async function retrieveAndProcessUserBalances(
   const multiCallResult = await Multicall(calls);
   const addressBalances = {};
   let deletedCounter = 0;
-
+let deletedAddresses = []
   orderedUniqueAddresses.forEach((user, index) => {
     const ethBalance = multiCallResult[index * 2];
     const maxClaimCost = multiCallResult[index * 2 + 1];
 
     if (ethBalance.lt(MIN_TO_SEND_CLAIM_POOL)) {
       deletedCounter++;
+deletedAddresses.push(user)
     } else {
       addressBalances[user] = {
         ethBalance,
@@ -340,6 +363,7 @@ async function retrieveAndProcessUserBalances(
     console.log(
       `${deletedCounter} addresses removed for not having enough eth balance to claim`
     );
+console.log(deletedAddresses)
   }
 
   return addressBalances;
