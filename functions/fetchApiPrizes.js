@@ -4,7 +4,7 @@ const {CONFIG} = require("../constants/config")
 const FetchApiPrizes = async (chain, draw, tiersToClaim, claims) => {
   ///testnet-80001-draw42
 //  console.log("tiers to claim",tiersToClaim)
-
+try{
   const url = "https://poolexplorer.xyz/" + chain + "-" + CONFIG.PRIZEPOOL + "-draw" + draw;
   //console.log(url)
   const fetchPrizes = await fetch(url);
@@ -42,6 +42,7 @@ const filteredWins = prizesResult.wins.filter((win) => {
 
   //check that its not putting wins on same vault on api that are actually diff vaults
   // need to exclude already claimed prizes
+}catch(e){console.log(e);return null}
 }
 
 module.exports = { FetchApiPrizes };

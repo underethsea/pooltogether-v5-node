@@ -1,6 +1,5 @@
 const fs = require("fs");
 const { CONTRACTS } = require("../constants/contracts");
-const { PROVIDERS } = require("../constants/providers");
 const { CONFIG } = require("../constants/config");
 const { ADDRESS } = require("../constants/address.js");
 const { GetLogs } = require("../utilities/getLogs");
@@ -10,16 +9,21 @@ const ethers = require("ethers");
 const { BuildTxForSwap } = require("../utilities/1inchSwap.js");
 const { AlchemyTransactionReceipt } = require("../utilities/alchemy");
 const { web3GasEstimate } = require("../utilities/web3");
+const { GetRecentClaims } = require("./getRecentClaims");
 
-const dotenv = require("dotenv").config({ path: "../.env" });
 const section = chalk.hex("#47FDFB");
 
-const { MINPROFIT, MINPROFITPERCENTAGE, MAXWINNERS, MAXINDICES, USESANTA, LAST_IN_LINE } =
-  CONFIG;
+const {
+  MINPROFIT,
+  MINPROFITPERCENTAGE,
+  MAXWINNERS,
+  MAXINDICES,
+  USESANTA,
+  LAST_IN_LINE,
+} = CONFIG;
 
 const PRIZETOKEN_ADDRESS = ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.ADDRESS;
-const PRIZETOKEN_SYMBOL = ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.SYMBOL
-
+const PRIZETOKEN_SYMBOL = ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.SYMBOL;
 
 const chalkProfit = (message) => {
   console.log(chalk.green(message));
@@ -38,7 +42,12 @@ const SendClaims = async (
   prizeTokenPrice,
   ethPrice
 ) => {
-  console.log(PRIZETOKEN_SYMBOL+" price $", prizeTokenPrice, " eth price $", ethPrice);
+  console.log(
+    PRIZETOKEN_SYMBOL + " price $",
+    prizeTokenPrice,
+    " eth price $",
+    ethPrice
+  );
 
   let feeRecipient = CONFIG.WALLET;
   console.log("total wins to claim ", vaultWins.length);
@@ -100,7 +109,6 @@ const SendClaims = async (
         prizesForThisBatch++;
         extraPrizes--;
       }
-
       const currentIndices = prizeIndices[i];
 
       if (currentTotalIndices + currentIndices.length <= prizesForThisBatch) {
@@ -125,7 +133,6 @@ const SendClaims = async (
     // console.log(winners)
     // console.log(prizeIndices)
 
-
     let minFeeToClaim = await CONTRACTS.CLAIMER[CONFIG.CHAINNAME].functions[
       "computeTotalFees(uint8,uint256)"
     ](tier, prizeIndices.flat().length);
@@ -139,7 +146,7 @@ const SendClaims = async (
     // console.log(minFeeToClaim, typeof minFeeToClaim, minFeeToClaim._isBigNumber);
 
     minFeeToClaim = minFeeToClaim.div(totalIndicesBN);
-
+    console.log("");
     console.log(section("   ---- transaction parameters -----"));
 
     if (prizeIndices.flat().length < originIndiceLength) {
@@ -237,7 +244,9 @@ const SendClaims = async (
         web3TotalGasCost.toString() +
         "wei ($" +
         web3TotalGasCostUSD.toFixed(2) +
-        ")"
+        ")",
+      " @ $" + ethPrice,
+      "ETH"
     );
 
     const estimateNetFromClaims =
@@ -245,17 +254,16 @@ const SendClaims = async (
     const estimateNetPercentage =
       (prizeTokenPrice * estimatedPrizeTokenReward) / web3TotalGasCostUSD;
     console.log(
-      "assuming ETH price ",
-      ethPrice," ",PRIZETOKEN_SYMBOL,
-      " price",
-      prizeTokenPrice
+      PRIZETOKEN_SYMBOL,
+      "reward ",
+      estimatedPrizeTokenReward,
+      " ($" +
+        (prizeTokenPrice * estimatedPrizeTokenReward).toFixed(2) +
+        ") @ $" +
+        prizeTokenPrice,
+      PRIZETOKEN_SYMBOL
     );
-    console.log(PRIZETOKEN_SYMBOL," prize token reward", estimatedPrizeTokenReward);
-    console.log(
-      " potential ",PRIZETOKEN_SYMBOL," reward $",
-      (prizeTokenPrice * estimatedPrizeTokenReward).toFixed(2),
-      ` estimated claim cost USD: $${web3TotalGasCostUSD.toFixed(2)}`
-    ); //ETH: ${totalGasCostEther.toFixed(2)}
+    //ETH: ${totalGasCostEther.toFixed(2)}
 
     //  let txToEstimate = contract.populateTransaction.claimPrizes(vault, tier, winners, prizeIndices, feeRecipient, minFeeToClaim);
     //let estimate = await estimateGas(txToEstimate)
@@ -414,113 +422,41 @@ const SendClaims = async (
           console.log("not meeting profit threshold for santa claim");
         }
       } else {
-        //return // to not send claims
-        let tx = await contract.claimPrizes(
+        //return // to not send claims (for testing)
+
+        const recentClaims = await GetRecentClaims(CONFIG.CHAINID, -10000);
+        const hasBeenClaimed = checkIfWinHasBeenClaimed(
+          recentClaims,
           vault,
           tier,
           finalWinners,
-          finalPrizeIndices,
-          feeRecipient,
-          minFeeToClaim,
-          {
-            gasLimit: BigInt(
-              500000 + 169000 * (prizeIndices.flat().length - 1)
-            ),
-            maxPriorityFeePerGas: "1010000",
-          }
+          finalPrizeIndices
         );
-        receipt = await tx.wait();
-        //console.log("receipt",receipt)
+
+        if (hasBeenClaimed) {
+          console.log("! Aborted ! Wins recently claimed");
+        } else {
+// return
+          let tx = await contract.claimPrizes(
+            vault,
+            tier,
+            finalWinners,
+            finalPrizeIndices,
+            feeRecipient,
+            minFeeToClaim,
+            {
+              gasLimit: BigInt(
+                500000 + 169000 * (prizeIndices.flat().length - 1)
+              ),
+              maxPriorityFeePerGas: "1010000",
+            }
+          );
+          receipt = await tx.wait();
+          //console.log("receipt",receipt)
+        }
       }
       if (receipt && receipt.gasUsed !== undefined) {
-        const L2transactionCost =
-          Number(receipt.gasUsed * receipt.effectiveGasPrice) / 1e18;
-
-        const alchemyReceipt = await AlchemyTransactionReceipt(
-          receipt.transactionHash
-        );
-
-        const L1transactionCost = Number(alchemyReceipt.result.l1Fee) / 1e18;
-        console.log("L2 Gas fees (in ETH) " + L2transactionCost);
-        console.log("L1 Gas fees (in ETH) " + L1transactionCost);
-
-        totalTransactionCost = L2transactionCost + L1transactionCost;
-        totalTransasactionCostDollar = totalTransactionCost * ethPrice;
-
-        console.log(
-          "Total Gas fees " +
-            totalTransactionCost +
-            "($" +
-            totalTransasactionCostDollar +
-            ")"
-        );
-
-        // todo not right
-        console.log(
-          "tx",
-          receipt.transactionHash,
-          " gas used",
-          receipt.gasUsed.toString()
-        ); //, " tx cost $",transactionCost.toFixed(4))
-        let totalPayout = 0;
-        let totalFee = 0;
-        const logs = GetLogs(receipt, ABI.PRIZEPOOL);
-        logs.forEach((log) => {
-          if (log.name === "ClaimedPrize") {
-            const payout = parseInt(log.args.payout);
-            const fee = parseInt(log.args.fee);
-            totalPayout += payout;
-            totalFee += fee;
-            console.log(
-              "prize payout ",
-              (payout / 1e18).toFixed(4),
-              " fee collected ",
-              (fee / 1e18).toFixed(4)
-            );
-          }
-        });
-
-        // File path for storing claim logs
-        const dataFilePath = "./data/claim-history.json";
-
-        // Initialization
-        let fileData = [];
-        if (fs.existsSync(dataFilePath)) {
-          fileData = JSON.parse(fs.readFileSync(dataFilePath, "utf-8"));
-        }
-
-        // Store data
-        fileData.push({
-          txHash: receipt.transactionHash,
-          prizes: logs.length,
-          totalPayout: totalPayout,
-          totalFee: totalFee,
-          totalGasETH: totalTransactionCost,
-          ethPrice: ethPrice,
-          poolPrice: prizeTokenPrice,
-          time: Date.now(),
-        });
-
-        // Save data back to file
-        fs.writeFileSync(dataFilePath, JSON.stringify(fileData, null, 2));
-
-        console.log(
-          "total payout ",
-          (totalPayout / 1e18).toFixed(4),
-          " total fee collected ",
-          (totalFee / 1e18).toFixed(4)
-        );
-
-        // todo not right, damn gas
-        const netFromClaims =
-          totalFee * prizeTokenPrice - totalTransasactionCostDollar;
-        const netFromClaimMessage =
-          "$" +
-          (prizeTokenPrice * (totalFee / 1e18)).toFixed(4) +
-          " fee collected  - $"; // + transactionCost.toFixed(4) + " tx cost = " + netFromClaims.toFixed(4)
-        netFromClaims > 0
-          ? console.log(chalkProfit(netFromClaimMessage))
-          : console.log(chalkLoss(netFromClaimMessage));
+        await processReceipt(receipt, ethPrice, prizeTokenPrice);
       } else {
         console.log(
           "......not above profit threshold of $",
@@ -536,13 +472,21 @@ const SendClaims = async (
           " & ",
           (estimateNetPercentage * 100).toFixed(2),
           //(hoestimateNetPercentage * 100).toFixed(2),
-
           "%"
         );
       }
       await delay(3500); // wait 3.5 seconds before next call becaus 1inch api
+    } else {
+      console.log(
+        "minimum profit NOT met, estimated net = $",
+        estimateNetFromClaims.toFixed(2),
+        " | MINPROFIT",
+        MINPROFIT,
+        " %",
+        MINPROFITPERCENTAGE
+      );
     }
-    await delay(600) // wait .6 seconds so to not overload RPC calls per second
+    await delay(600); // wait .6 seconds so to not overload RPC calls per second
   }
   return;
 };
@@ -569,11 +513,9 @@ function groupDataByVaultAndTier(vaultWins) {
     } else {
       group.prizeIndices[winnerIndex].push(...prizeIndicesForWinner);
     }
-
     return groups;
   }, {});
 }
-
 
 // use to send 1inch contract swap to different address than config.wallet
 function replaceAddressInCalldata(data, originalAddress, replacementAddress) {
@@ -589,6 +531,126 @@ function replaceAddressInCalldata(data, originalAddress, replacementAddress) {
   return data.split(strippedOriginal).join(strippedReplacement);
 }
 
+function checkIfWinHasBeenClaimed(
+  recentClaims,
+  vault,
+  tier,
+  finalWinners,
+  finalPrizeIndices
+) {
+  for (let i = 0; i < finalWinners.length; i++) {
+    const winner = finalWinners[i];
+    const indices = finalPrizeIndices[i];
+
+    for (const index of indices) {
+      const claim = recentClaims.find(
+        (claim) =>
+          claim.vault === vault &&
+          claim.tier === tier &&
+          claim.winner === winner &&
+          claim.index === index
+      );
+
+      if (claim) {
+        console.log("Win has already been claimed:", claim);
+        return true; // Win has been claimed
+      }
+    }
+  }
+  return false; // Win has not been claimed
+}
+
+async function processReceipt(receipt, ethPrice, prizeTokenPrice) {
+  const L2transactionCost =
+    Number(receipt.gasUsed * receipt.effectiveGasPrice) / 1e18;
+
+  const alchemyReceipt = await AlchemyTransactionReceipt(
+    receipt.transactionHash
+  );
+
+  const L1transactionCost = Number(alchemyReceipt.result.l1Fee) / 1e18;
+  console.log("L2 Gas fees (in ETH) " + L2transactionCost);
+  console.log("L1 Gas fees (in ETH) " + L1transactionCost);
+
+  totalTransactionCost = L2transactionCost + L1transactionCost;
+  totalTransasactionCostDollar = totalTransactionCost * ethPrice;
+
+  console.log(
+    "Total Gas fees " +
+      totalTransactionCost +
+      "($" +
+      totalTransasactionCostDollar +
+      ")"
+  );
+
+  // todo not right
+  console.log(
+    "tx",
+    receipt.transactionHash,
+    " gas used",
+    receipt.gasUsed.toString()
+  ); //, " tx cost $",transactionCost.toFixed(4))
+  let totalPayout = 0;
+  let totalFee = 0;
+  const logs = GetLogs(receipt, ABI.PRIZEPOOL);
+  logs.forEach((log) => {
+    if (log.name === "ClaimedPrize") {
+      const payout = parseInt(log.args.payout);
+      const fee = parseInt(log.args.fee);
+      totalPayout += payout;
+      totalFee += fee;
+      console.log(
+        "prize payout ",
+        (payout / 1e18).toFixed(4),
+        " fee collected ",
+        (fee / 1e18).toFixed(4)
+      );
+    }
+  });
+
+  // File path for storing claim logs
+  const dataFilePath = "./data/claim-history.json";
+
+  // Initialization
+  let fileData = [];
+  if (fs.existsSync(dataFilePath)) {
+    fileData = JSON.parse(fs.readFileSync(dataFilePath, "utf-8"));
+  }
+
+  // Store data
+  fileData.push({
+    txHash: receipt.transactionHash,
+    prizes: logs.length,
+    totalPayout: totalPayout,
+    totalFee: totalFee,
+    totalGasETH: totalTransactionCost,
+    ethPrice: ethPrice,
+    poolPrice: prizeTokenPrice,
+    time: Date.now(),
+  });
+
+  // Save data back to file
+  fs.writeFileSync(dataFilePath, JSON.stringify(fileData, null, 2));
+
+  console.log(
+    "total payout ",
+    (totalPayout / 1e18).toFixed(4),
+    " total fee collected ",
+    (totalFee / 1e18).toFixed(4)
+  );
+
+  const netFromClaims =
+    ((totalFee/1e18) * prizeTokenPrice) - ((totalTransactionCost  * ethPrice));
+  const netFromClaimMessage =
+    "$" +
+    (prizeTokenPrice * (totalFee / 1e18)).toFixed(4) +
+    " fee collected  - $"+ 
+   (ethPrice * (totalTransactionCost)).toFixed(4) + " gas cost = $" + netFromClaims.toFixed(4) + " net"
+  netFromClaims > 0
+    ? console.log(chalkProfit(netFromClaimMessage))
+    : console.log(chalkLoss(netFromClaimMessage));
+return
+}
 
 module.exports = { groupDataByVaultAndTier };
 

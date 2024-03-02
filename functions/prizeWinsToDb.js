@@ -158,7 +158,7 @@ for (let x = 0; x <= completeBlocks.length; x++) {
   }*/
 await PrizeWinsToDb(CONFIG.CHAINID,nowBlock);
 }
- doAll();
+// doAll();
 
 module.exports = {PrizeWinsToDb}
 

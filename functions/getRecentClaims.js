@@ -5,9 +5,9 @@ const {CONFIG} = require("../constants/config")
 const {CONTRACTS} = require("../constants/contracts")
 const {GetChainName} = require("../constants/address")
 
-const GetRecentClaims = async (chain=CONFIG.CHAINID,startBlock=-2000000,toBlock="latest") => {
+const GetRecentClaims = async (chain=CONFIG.CHAINID,startBlock=-500000,toBlock="latest") => {
 
-console.log("claims for chain",chain," name ",GetChainName(chain))
+// console.log("claims for chain",chain," name ",GetChainName(chain))
 
     const claimFilter = {
       address: ADDRESS[GetChainName(chain)].PRIZEPOOL,

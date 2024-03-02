@@ -1,23 +1,21 @@
 const ethers = require("ethers");
-const { CONTRACTS } = require("./constants/contracts.js");
 // const { CONTRACTS, PROVIDERS, SIGNER, ABI } = require("./constants/index")
-const { PROVIDERS, SIGNER } = require("./constants/providers.js");
+const { SIGNER } = require("./constants/providers.js");
 const { ADDRESS } = require("./constants/address.js");
 const { ABI } = require("./constants/abi.js");
 const { CONFIG } = require("./constants/config.js");
 const { FetchApiPrizes } = require("./functions/fetchApiPrizes.js");
-const { GetWinners } = require("./functions/winners.js")
-const { GetRecentClaims } = require("./functions/getRecentClaims.js")
-const { SendClaims } = require("./functions/sendClaims.js")
+const { GetWinners } = require("./functions/winners.js");
+const { GetRecentClaims } = require("./functions/getRecentClaims.js");
+const { SendClaims } = require("./functions/sendClaims.js");
 const chalk = require("chalk");
 const { GetPrizePoolData } = require("./functions/getPrizePoolData.js");
 const { GeckoIDPrices } = require("./utilities/geckoFetch.js");
-const { GetPricesForToken } = require("./utilities/1inch.js")
-const { CollectRewards } = require("./collectRewards.js")
-//const settings = require('./constants/liquidator-config'); 
+const { GetPricesForToken } = require("./utilities/1inch.js");
+const { CollectRewards } = require("./collectRewards.js");
+//const settings = require('./constants/liquidator-config');
 
-const {minTimeInMilliseconds, maxTimeInMilliseconds, useCoinGecko } = CONFIG;
-
+const { minTimeInMilliseconds, maxTimeInMilliseconds, useCoinGecko } = CONFIG;
 
 // covalent, not accurate to get twab players
 // const FetchPlayers = require("./utilities/players.js");
@@ -29,34 +27,62 @@ const claimerContract = new ethers.Contract(
   ABI.CLAIMER,
   SIGNER
 );
-
 async function go() {
   console.log(section("----- starting claim bot ------"));
-  console.log("fetching recent claim events");
+  console.log("time logged | ", Date.now());
 
-  let claims = await GetRecentClaims(CONFIG.CHAINID);
+  const claimsPromise = GetRecentClaims(CONFIG.CHAINID);
+  const prizePoolDataPromise = GetPrizePoolData();
+
+  // Set up the third promise based on the useCoinGecko flag
+  const priceFetchPromise = useCoinGecko
+    ? GeckoIDPrices(["pooltogether", "ethereum"])
+    : GetPricesForToken(ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.ADDRESS);
+
+  // Use Promise.all to wait for all three promises to resolve
+  const [claims, prizePoolData, priceData] = await Promise.all([
+    claimsPromise,
+    prizePoolDataPromise,
+    priceFetchPromise,
+  ]);
+
   console.log("got " + claims.length + " claim events ", "\n");
 
-  const ethAndPoolPrices = await GeckoIDPrices(["pooltogether", "ethereum"]);
- 
-  let prizeTokenPrice
+  // Extract the necessary data from prizePoolData
+  const {
+    lastDrawId,
+    numberOfTiers,
+    tierTimestamps,
+    prizesForTier,
+    maxFee,
+    tierPrizeValues,
+    tierRemainingLiquidites,
+    reserve,
+  } = prizePoolData;
 
-  if(useCoinGecko){prizeTokenPrice = ethAndPoolPrices[0];}
-  else  {prizeTokenPrice = await GetPricesForToken(ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.ADDRESS)}
+  let prizeTokenPrice, ethPrice;
 
-  const ethPrice = ethAndPoolPrices[1];
+  // If useCoinGecko is true, priceData is from GeckoIDPrices, otherwise it's the direct prize token price
+  if (useCoinGecko) {
+    prizeTokenPrice = priceData[0];
+    ethPrice = priceData[1];
+  } else {
+    // If not using CoinGecko, priceData is directly the prizeTokenPrice
+    prizeTokenPrice = priceData;
+    // Assume you have another way to get ethPrice if necessary or it's not needed in this branch
+  }
 
-  console.log(section("----- calling contract data ------"));
-  const {lastDrawId, numberOfTiers, tierTimestamps, prizesForTier, maxFee, tierPrizeValues, tierRemainingLiquidites, reserve} = await GetPrizePoolData()
+  console.log(section("----- contract data ------"));
 
-  maxFee.forEach((fee,index)=>{console.log("max fee for tier ",index, " -> ",parseInt(fee)/1e18)})
+  maxFee.forEach((fee, index) => {
+    console.log("max fee for tier ", index, " -> ", parseInt(fee) / 1e18);
+  });
   // console.log("prizes for Tier ",prizesForTier)
 
   let newWinners;
   console.log(section("----- getting winners -----"));
 
   if (!CONFIG.USEAPI) {
-  
     // await SendClaims(claimerContract, lastDrawId, []);
 
     newWinners = await GetWinners(
@@ -68,9 +94,7 @@ async function go() {
       prizesForTier,
       "latest"
     );
-  }
-
-  else {
+  } else {
     console.log("using api for winner calculations");
     newWinners = await FetchApiPrizes(
       CONFIG.CHAINID,
@@ -79,55 +103,74 @@ async function go() {
       claims
     );
   }
-  console.log("winners before removing claims", newWinners.length);
+  if (newWinners === null) {
+    console.log("ERROR fetching API");
+  } else {
+    console.log("winners before removing claims", newWinners.length);
 
-  newWinners = removeAlreadyClaimed(newWinners, claims, lastDrawId);
-  console.log("winners after removing claims", newWinners.length);
+    newWinners = removeAlreadyClaimed(newWinners, claims, lastDrawId);
+    console.log("winners after removing claims", newWinners.length);
 
-//  console.log(section("---- checking profitability -----"));
+    //  console.log(section("---- checking profitability -----"));
+    // console.log("time logged | ",Date.now())
+    await SendClaims(
+      claimerContract,
+      lastDrawId,
+      newWinners,
+      maxFee,
+      prizeTokenPrice,
+      ethPrice
+    );
+    console.log("");
+    console.log(section("----- rewards check and claim ------"));
 
-  await SendClaims(claimerContract, lastDrawId, newWinners, maxFee, prizeTokenPrice, ethPrice);
-  console.log(section("----- rewards check and claim ------"));
+    await CollectRewards(prizeTokenPrice, ethPrice);
+  }
 
-await CollectRewards(prizeTokenPrice,ethPrice)
+  console.log(
+    "-------------------------------------------bot will run again in " +
+      parseInt(minTimeInMilliseconds / 60000) +
+      "min - " +
+      parseInt(maxTimeInMilliseconds / 60000) +
+      "min------------ "
+  );
 }
-
 
 function removeAlreadyClaimed(winners, claims, drawId) {
-  // Filter the claims for the specified drawId and tier 
-  const relevantClaims = claims.filter(claim => claim.drawId === drawId);
-    
-  return winners   
-      .map(winner => {
-          const [vault, person,tier , prizeIndices] = winner;
-    
-          // Check each prize index to see if it's been claimed
-          const unclaimedPrizeIndices = prizeIndices.filter(prizeIndex =>
-              !relevantClaims.some(claim =>
-                  claim.vault.toLowerCase() === vault.toLowerCase() &&
-                  claim.winner.toLowerCase() === person.toLowerCase() &&
-                  claim.index === prizeIndex
-              )
-          );
-    
-          // Return the winner with only unclaimed prize indices
-          return [vault, person, tier, unclaimedPrizeIndices];
-      })
-      .filter(winner => winner[3].length > 0); // Remove winners with no unclaimed prizes
-}
+  // Filter the claims for the specified drawId and tier
+  const relevantClaims = claims.filter((claim) => claim.drawId === drawId);
 
+  return winners
+    .map((winner) => {
+      const [vault, person, tier, prizeIndices] = winner;
+
+      // Check each prize index to see if it's been claimed
+      const unclaimedPrizeIndices = prizeIndices.filter(
+        (prizeIndex) =>
+          !relevantClaims.some(
+            (claim) =>
+              claim.vault.toLowerCase() === vault.toLowerCase() &&
+              claim.winner.toLowerCase() === person.toLowerCase() &&
+              claim.index === prizeIndex
+          )
+      );
+
+      // Return the winner with only unclaimed prize indices
+      return [vault, person, tier, unclaimedPrizeIndices];
+    })
+    .filter((winner) => winner[3].length > 0); // Remove winners with no unclaimed prizes
+}
 
 async function executeAfterRandomTime(minTime, maxTime) {
   // Calculate a random time between minTime and maxTime
   const randomTime = minTime + Math.random() * (maxTime - minTime);
 
-  setTimeout(async () => { 
-try{   
- await go(); 
-} catch (error) {
-    console.error('Error occurred:', error);
-  }
-     console.log("---------------------------------------------------------do it again------------ ",Date.now())
+  setTimeout(async () => {
+    try {
+      await go();
+    } catch (error) {
+      console.error("Error occurred:", error);
+    }
     // Recursively call the function to continue the cycle
     executeAfterRandomTime(minTime, maxTime);
   }, randomTime);

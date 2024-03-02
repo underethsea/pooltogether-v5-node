@@ -5,7 +5,7 @@ const { ADDRESS, ADDRESS_AUCTION } = require("./constants/address.js");
 const ethers = require("ethers");
 const { GeckoIDPrices } = require("./utilities/geckoFetch.js");
 const { Multicall } = require("./utilities/multicall.js");
-const profitMarginUsd = 1.5
+const profitMarginUsd = 1.1
 
 let transactionAttempted = false;
 

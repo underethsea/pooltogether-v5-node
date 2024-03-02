@@ -9,7 +9,7 @@ const { PrizeWinsToDb } = require("./functions/prizeWinsToDb.js")
 const { AddClaim } = require("./functions/dbDonkey.js")
 const ethers = require("ethers")
 const { DiscordNotifyClaimPrize } = require("./functions/discordAlert.js")
-
+const { DailyReport } = require("./functions/dailyReport")
 const chain = CONFIG.CHAINNAME
 const chainId = CONFIG.CHAINID
 
@@ -38,13 +38,14 @@ const FILTERS = {
 async function listen() {
     console.log("listening for complete award and claim events")
      PROVIDERS[chain].on(FILTERS.DRAWAWARDED, (drawCompletedEvent) => {
-         try {
              console.log("draw completed event", drawCompletedEvent)
-             PrizeWinsToDb(chainId,drawCompletedEvent.blockNumber).then((finished)=>{console.log("db updated")})
-                      
-}catch(error){console.log(error)}
+		try{DailyReport()}catch(e){console.log(e)}
+
+                try {
+                   PrizeWinsToDb(chainId,drawCompletedEvent.blockNumber).then((finished)=>{console.log("db updated")})                      
+                }catch(error){console.log(error)}
 //try{LiquidateNow()}catch(e){console.log(e)}     
-})
+          })
 //console.log(WS_PROVIDERS[chain])
     PROVIDERS[chain].on(FILTERS.CLAIMEDPRIZE, (claimEvent) => {
       try {
