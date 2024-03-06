@@ -249,7 +249,8 @@ async function go() {
               );
             }
 
-            const results = await Multicall(multiCallArray);
+            let results
+            try{results = await Multicall(multiCallArray)}catch(e){console.log(e)}
 
             let bestPercentageProfit = 0;
             let bestPercentageIndex = 0;
@@ -393,8 +394,8 @@ async function go() {
                   )
                 );
               }
-
-              const results = await Multicall(refinedMultiCallArray); // overwrite the results array
+              let results
+              try{results = await Multicall(refinedMultiCallArray)}catch(e){console.log(e)}
 
               bestProfit = -Infinity; // Reset best profit for refined calculations
               console.log(section(">> Refined tx params | pair ", pairAddress));
@@ -800,11 +801,13 @@ async function go() {
               console.log("not enough prize token to send liquidation");
               continue;
             }
+            let swapCheck
+            try{
             // check that swap conditions are as expected before sending
-            const swapCheck =
+            swapCheck =
               await contractWSigner.callStatic.computeExactAmountIn(
                 bestOptionOut
-              );
+              );}catch(e){console.log(e);swapCheck=ethers.BigNumber.from(0);}
             if (swapCheck.gt(bestOptionIn)) {
               console.log("swap conditions have changed. need to recalculate.");
               continue;
