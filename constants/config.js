@@ -40,6 +40,8 @@ const CONFIG = {
   maxGas: 600000, // Estimated gas amount per transaction
   profitThreshold: 0.02, // Profit threshold in $ for considering a transaction
   profitPercentage: 1.001, // Required profit percentage over cost
+  ONLYLIQUIDATE: [], // array of pairs to liquidate
+  DONTLIQUIDATE: [], // array of pairs to exclude
 
   // WinBooster Configuration
   FEE: 4, // claimer fee (ex 5 = 5%)   
