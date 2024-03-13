@@ -535,9 +535,9 @@ async function go() {
               "tx params | pair",
               pairAddress,
               "  max out ",
-              bestOptionOut.toString() / 1e6,
+              bestOptionOut.toString() / Math.pow(10,pairDecimals),
               "amount in ",
-              bestOptionIn.toString() / 1e18,
+              bestOptionIn.toString() / Math.pow(10,ADDRESS[CONFIG.CHAINNAME].PRIZETOKEN.DECIMALS),
               " deadline ",
               unixTimestamp
             );
@@ -546,9 +546,9 @@ async function go() {
 
             // Specify the function and its arguments
             const functionName = "swapExactAmountOut";
-            console.log("config wallet", CONFIG.WALLET);
+            //console.log("config wallet", CONFIG.WALLET);
             const poolFromAddress =
-              "0xe0e7b7C5aE92Fe94D2ae677D81214D6Ad7A11C27";
+              CONFIG.WALLET;
             const args = [
               pairAddress,
               //ADDRESS[CONFIG.CHAINNAME].SWAPPER,
@@ -562,8 +562,12 @@ async function go() {
             const data = CONTRACTS.LIQUIDATIONROUTERSIGNER[
               CONFIG.CHAINNAME
             ].interface.encodeFunctionData(functionName, args);
-            // calculate total gas cost in wei
 
+if (maxToSendWithSlippage.gt(walletPrizeTokenBalance)) {
+              console.log("not enough prize token to estimate and send liquidation");
+              continue;
+            }else{console.log("enough to estimate",maxToSendWithSlippage.toString(),walletPrizeTokenBalance.toString())}
+            // calculate total gas cost in wei
             web3TotalGasCost = await web3GasEstimate(
               data,
               CONFIG.CHAINID,
@@ -610,7 +614,7 @@ async function go() {
               //console.log("profitable with cray gas, returning");return
               console.log("yes USDC/PTUSDC OR POOL");
               console.log("best option out amount", bestOptionOut.toString());
-              const bestOptionOutValue = bestOptionOut / 1e6;
+              const bestOptionOutValue = bestOptionOut / Math.pow(10,pairDecimals);
               console.log("best option out value", bestOptionOutValue);
 
               // multiply by 5 to get estimated cost for entire arb with SWAPPER contrract
